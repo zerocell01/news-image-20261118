@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-"""Compose the day-in-one-picture cover: 1024x1024 PNG, no network."""
-import math
+"""Compose the 18 November cover: a 1024x1024 PNG, drawn offline with Pillow.
+
+The scene is the Kerch Strait bridge with its middle span torn out: night gradient,
+steel trusses, fire at the gap, then the day's lead set as a front page over it.
+"""
 import random
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
@@ -20,6 +23,7 @@ def font(path, size):
 
 
 def gradient():
+    """Vertical night gradient, dark at the masthead and lighter at the water."""
     img = Image.new("RGB", (W, H), NIGHT_TOP)
     d = ImageDraw.Draw(img)
     for y in range(H):
@@ -33,6 +37,7 @@ def gradient():
 
 
 def glow(img, xy, radius, colour, strength=120):
+    """Blurred light pool blended under the drawing."""
     layer = Image.new("RGB", (W, H), (0, 0, 0))
     d = ImageDraw.Draw(layer)
     x, y = xy
@@ -42,18 +47,16 @@ def glow(img, xy, radius, colour, strength=120):
 
 
 def bridge(d):
-    """Stylised bridge: two steel trusses, the middle span torn out."""
+    """Draw the strait: water, piers, two intact spans and the torn middle span."""
     deck_y = 300
     water_y = 320
     d.rectangle([0, water_y, W, H], fill=(12, 17, 25))
     d.line([(0, water_y), (W, water_y)], fill=(44, 54, 70), width=2)
     for i in range(40):
         y = water_y + i * 3
-        d.line([(40, y), (W - 40, y)], fill=(12 + i // 6, 17 + i // 5, 25 + i // 4))
-    # piers
+        d.line([(0, y), (W, y)], fill=(12 + i // 6, 17 + i // 5, 25 + i // 4))
     for px in (150, 300, 724, 874):
         d.rectangle([px - 13, deck_y - 6, px + 13, water_y + 26], fill=(24, 30, 40))
-    # standing spans (left and right), truss diagonals
     for start, end in ((60, 430), (594, 964)):
         d.rectangle([start, deck_y - 10, end, deck_y + 8], fill=(38, 46, 58))
         span = end - start
@@ -62,24 +65,25 @@ def bridge(d):
             d.line([(x0, deck_y - 10), (x0 + 26, deck_y + 8)], fill=(56, 66, 82), width=3)
             d.line([(x0, deck_y + 8), (x0 + 26, deck_y - 10)], fill=(56, 66, 82), width=3)
         d.line([(start, deck_y - 34), (end, deck_y - 34)], fill=(52, 61, 76), width=3)
-    # broken span: jagged stubs sagging into the water
     d.polygon([(430, deck_y - 10), (470, deck_y + 4), (452, water_y + 30), (430, water_y + 30)],
               fill=(46, 54, 68))
     d.polygon([(594, deck_y - 10), (556, deck_y + 6), (572, water_y + 30), (594, water_y + 30)],
               fill=(46, 54, 68))
-    # snapped rails
     for dy in (-2, 4):
         d.line([(430, deck_y + dy), (470, water_y + 26)], fill=RED, width=2)
         d.line([(594, deck_y + dy), (556, water_y + 26)], fill=RED, width=2)
-    # fire at the gap and smoke plumes
+
+
+def fire_and_smoke(d):
+    """Flame at the gap and a plume rising off it, both from a fixed seed."""
     rnd = random.Random(7)
-    for i in range(90):
+    for _ in range(90):
         cx = rnd.gauss(512, 44)
         cy = rnd.gauss(288, 30) - abs(rnd.gauss(0, 24))
         r = rnd.randint(6, 26)
         shade = rnd.randint(150, 235)
         d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(shade, shade // 2 + 30, 40))
-    for i in range(46):
+    for _ in range(46):
         cx = rnd.gauss(512, 52)
         cy = rnd.gauss(238, 52)
         r = rnd.randint(9, 28)
@@ -88,6 +92,7 @@ def bridge(d):
 
 
 def masthead(d):
+    """Kicker and date, ruled off from the picture."""
     d.text((56, 46), "THE DAY IN ONE PICTURE", font=font(F_BOLD, 30), fill=RED)
     right = "WEDNESDAY 18 NOVEMBER 2026"
     f = font(F_REG, 19)
@@ -96,6 +101,7 @@ def masthead(d):
 
 
 def headline(d):
+    """The lead, three lines, last one in red."""
     y = 438
     d.text((52, y), "CRIMEAN", font=font(F_BOLD, 120), fill=INK)
     d.text((52, y + 106), "BRIDGE CUT", font=font(F_BOLD, 120), fill=INK)
@@ -104,14 +110,15 @@ def headline(d):
 
 
 def deck(d):
+    """One sentence of what happened, wrapped to the column."""
     body = ("Ukraine's seven-stage missile and drone attack drops a span of Putin's "
             "bridge over the Kerch Strait; Russia strikes Kyiv's bridges in reply.")
     f = font(F_REG, 23)
-    wrap = ImageDraw.Draw(Image.new("RGB", (10, 10)))
-    words, lines, cur = body.split(), [], ""
-    for w in words:
+    ruler = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+    lines, cur = [], ""
+    for w in body.split():
         trial = (cur + " " + w).strip()
-        if wrap.textlength(trial, font=f) <= W - 112:
+        if ruler.textlength(trial, font=f) <= W - 112:
             cur = trial
         else:
             lines.append(cur)
@@ -124,6 +131,7 @@ def deck(d):
 
 
 def also(d):
+    """The day's other stories, numbered, in two columns under the deck."""
     items = [
         "Trump, Xi and Putin meet in Shenzhen as a spy scandal bites China's AI plans",
         "US loses measles elimination status after 26 years and 5,400 cases",
@@ -132,15 +140,13 @@ def also(d):
     ]
     f = font(F_REG, 17)
     d.text((56, 872), "ALSO TODAY", font=font(F_BOLD, 17), fill=(120, 128, 142))
-    cols = [(56, 0, 1), (536, 0, 2)]
-    y = [900, 900]
+    y = {0: 900, 1: 900}
     for idx, txt in enumerate(items):
         col = 0 if idx < 2 else 1
         x = 56 if col == 0 else 536
-        n = idx + 1
-        d.text((x, y[col]), f"{n}", font=font(F_BOLD, 17), fill=RED)
-        words, cur, lines = txt.split(), "", []
-        for w in words:
+        d.text((x, y[col]), f"{idx + 1}", font=font(F_BOLD, 17), fill=RED)
+        lines, cur = [], ""
+        for w in txt.split():
             trial = (cur + " " + w).strip()
             if d.textlength(trial, font=f) <= 380:
                 cur = trial
@@ -160,13 +166,15 @@ def main():
     img = glow(img, (512, 190), 220, (58, 68, 92), 60)
     d = ImageDraw.Draw(img)
     bridge(d)
+    fire_and_smoke(d)
     masthead(d)
     d.line([(56, 414), (W - 56, 414)], fill=(72, 80, 96), width=2)
     headline(d)
     deck(d)
     also(d)
     d.line([(56, 998), (W - 56, 998)], fill=(52, 58, 70), width=1)
-    d.text((56, 1004), "one image, a day's world news · make.fun · news-image-20261118", font=font(F_REG, 14), fill=(92, 100, 114))
+    d.text((56, 1004), "one image, a day's world news · make.fun · news-image-20261118",
+           font=font(F_REG, 14), fill=(92, 100, 114))
     img.save("entry.png", "PNG", optimize=True)
 
 
